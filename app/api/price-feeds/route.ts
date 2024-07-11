@@ -15,8 +15,6 @@ export async function GET() {
           price: price?.price,
           confidence: price?.conf,
           publishTime: price?.publishTime,
-          emaPrice: feed.emaPrice.price,
-          emaConfidence: feed.emaPrice.conf,
         };
       });
       return acc;

@@ -43,31 +43,36 @@ export const PRICE_FEED_SYMBOLS: { [key: string]: string } = {
 };
 
 class PythClient {
-  private connection: PriceServiceConnection;
-
-  constructor() {
-    this.connection = new PriceServiceConnection(PYTH_ENDPOINT);
-  }
-
-  async getPriceFeeds(): Promise<{ [key: string]: PriceFeed[] }> {
-    const allPriceIds = Object.values(PRICE_FEED_IDS).flat();
-    try {
-      console.log('Fetching price feeds...');
-      const priceFeeds = await this.connection.getLatestPriceFeeds(allPriceIds);
-      console.log('Raw price feeds:', JSON.stringify(priceFeeds, null, 2));
-
-      const categorizedFeeds = Object.entries(PRICE_FEED_IDS).reduce((acc, [category, ids]) => {
-        acc[category] = priceFeeds.filter(feed => ids.includes(feed.id));
-        return acc;
-      }, {} as { [key: string]: PriceFeed[] });
-
-      console.log('Categorized feeds:', JSON.stringify(categorizedFeeds, null, 2));
-      return categorizedFeeds;
-    } catch (error) {
-      console.error('Error fetching price feeds:', error);
-      throw error;
+    private connection: PriceServiceConnection;
+  
+    constructor() {
+      this.connection = new PriceServiceConnection(PYTH_ENDPOINT);
     }
-  }
+  
+    async getPriceFeeds(): Promise<{ [key: string]: PriceFeed[] }> {
+      const allPriceIds = Object.values(PRICE_FEED_IDS).flat();
+      try {
+        console.log('Fetching price feeds...');
+        const priceFeeds = await this.connection.getLatestPriceFeeds(allPriceIds);
+        
+        if (!priceFeeds) {
+          throw new Error('No price feeds returned');
+        }
+  
+        console.log('Raw price feeds:', JSON.stringify(priceFeeds, null, 2));
+  
+        const categorizedFeeds = Object.entries(PRICE_FEED_IDS).reduce((acc, [category, ids]) => {
+          acc[category] = priceFeeds.filter((feed: { id: string; }) => ids.includes(feed.id));
+          return acc;
+        }, {} as { [key: string]: PriceFeed[] });
+  
+        console.log('Categorized feeds:', JSON.stringify(categorizedFeeds, null, 2));
+        return categorizedFeeds;
+      } catch (error) {
+        console.error('Error fetching price feeds:', error);
+        throw error;
+      }
+    }
 
   subscribeToPriceFeeds(callback: (priceFeed: PriceFeed) => void) {
     const allPriceIds = Object.values(PRICE_FEED_IDS).flat();
