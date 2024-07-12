@@ -53,11 +53,35 @@ class PythClient {
     const allPriceIds = Object.values(PRICE_FEED_IDS).flat();
     try {
       console.log('Fetching price feeds...');
-      return await this.connection.getLatestPriceFeeds(allPriceIds);
+      const feeds = await this.connection.getLatestPriceFeeds(allPriceIds);
+      if (!feeds) {
+        console.warn('No price feeds returned from Pyth Network');
+        return [];
+      }
+      console.log(`Received ${feeds.length} price feeds`);
+      feeds.forEach(feed => {
+        const price = feed.getPriceNoOlderThan(60);
+        const emaPrice = feed.getEmaPriceNoOlderThan(60);
+        console.log(`Feed ID: ${feed.id}, Symbol: ${PRICE_FEED_SYMBOLS[feed.id]}, Price: ${price?.price}, EMA Price: ${emaPrice?.price}`);
+      });
+      return feeds;
     } catch (error) {
       console.error('Error fetching price feeds:', error);
+      if (error instanceof Error) {
+        console.error('Error details:', error.message);
+        console.error('Error stack:', error.stack);
+      }
       throw error;
     }
+  }
+
+  subscribeToUpdates(callback: (priceFeed: PriceFeed) => void) {
+    const allPriceIds = Object.values(PRICE_FEED_IDS).flat();
+    this.connection.subscribePriceFeedUpdates(allPriceIds, callback);
+  }
+
+  closeConnection() {
+    this.connection.closeWebSocket();
   }
 }
 
