@@ -2,7 +2,7 @@ import { PriceServiceConnection, PriceFeed } from '@pythnetwork/price-service-cl
 
 const PYTH_ENDPOINT = "https://hermes.pyth.network";
 
-const PRICE_FEED_IDS = {
+export const PRICE_FEED_IDS = {
   crypto: [
     '0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43', // BTC/USD
     '0xef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d', // SOL/USD
@@ -43,49 +43,21 @@ export const PRICE_FEED_SYMBOLS: { [key: string]: string } = {
 };
 
 class PythClient {
-    private connection: PriceServiceConnection;
-  
-    constructor() {
-      this.connection = new PriceServiceConnection(PYTH_ENDPOINT);
-    }
-  
-    async getPriceFeeds(): Promise<{ [key: string]: PriceFeed[] }> {
-      const allPriceIds = Object.values(PRICE_FEED_IDS).flat();
-      try {
-        console.log('Fetching price feeds...');
-        const priceFeeds = await this.connection.getLatestPriceFeeds(allPriceIds);
-        
-        if (!priceFeeds) {
-          throw new Error('No price feeds returned');
-        }
-  
-        console.log('Raw price feeds:', JSON.stringify(priceFeeds, null, 2));
-  
-        const categorizedFeeds = Object.entries(PRICE_FEED_IDS).reduce((acc, [category, ids]) => {
-          acc[category] = priceFeeds.filter((feed: { id: string; }) => ids.includes(feed.id));
-          return acc;
-        }, {} as { [key: string]: PriceFeed[] });
-  
-        console.log('Categorized feeds:', JSON.stringify(categorizedFeeds, null, 2));
-        return categorizedFeeds;
-      } catch (error) {
-        console.error('Error fetching price feeds:', error);
-        throw error;
-      }
-    }
+  private connection: PriceServiceConnection;
 
-  subscribeToPriceFeeds(callback: (priceFeed: PriceFeed) => void) {
-    const allPriceIds = Object.values(PRICE_FEED_IDS).flat();
-    this.connection.subscribePriceFeedUpdates(allPriceIds, callback);
+  constructor() {
+    this.connection = new PriceServiceConnection(PYTH_ENDPOINT);
   }
 
-  unsubscribeFromPriceFeeds() {
+  async getPriceFeeds(): Promise<PriceFeed[]> {
     const allPriceIds = Object.values(PRICE_FEED_IDS).flat();
-    this.connection.unsubscribePriceFeedUpdates(allPriceIds);
-  }
-
-  closeConnection() {
-    this.connection.closeWebSocket();
+    try {
+      console.log('Fetching price feeds...');
+      return await this.connection.getLatestPriceFeeds(allPriceIds);
+    } catch (error) {
+      console.error('Error fetching price feeds:', error);
+      throw error;
+    }
   }
 }
 
