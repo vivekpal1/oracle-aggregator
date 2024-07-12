@@ -27,8 +27,9 @@ const toNumber = (value: string | number | undefined): number => {
 
 export async function GET() {
   try {
-    console.log('Fetching price feeds from Pyth Network...');
+    console.log('API: Fetching price feeds from Pyth Network...');
     const priceFeeds = await pythClient.getPriceFeeds();
+    console.log(`API: Received ${priceFeeds.length} price feeds`);
     
     const categorizedFeeds: CategorizedFeeds = {
       crypto: [],
@@ -59,14 +60,16 @@ export async function GET() {
         categorizedFeeds.metals.push(feedData);
       } else if (PRICE_FEED_IDS.forex.includes(feed.id)) {
         categorizedFeeds.forex.push(feedData);
+      } else {
+        console.warn(`API: Unrecognized feed ID: ${feed.id}`);
       }
     });
 
-    console.log('Categorized feeds:', JSON.stringify(categorizedFeeds, null, 2));
+    console.log('API: Categorized feeds:', JSON.stringify(categorizedFeeds, null, 2));
 
     return NextResponse.json(categorizedFeeds);
   } catch (error) {
-    console.error('Error in price feeds API:', error);
+    console.error('API: Error in price feeds API:', error);
     return NextResponse.json({ error: 'Failed to fetch price feeds', details: (error as Error).message }, { status: 500 });
   }
 }

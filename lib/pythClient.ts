@@ -44,6 +44,8 @@ export const PRICE_FEED_SYMBOLS: { [key: string]: string } = {
 
 class PythClient {
   private connection: PriceServiceConnection;
+  private reconnectAttempts: number = 0;
+  private maxReconnectAttempts: number = 5;
 
   constructor() {
     this.connection = new PriceServiceConnection(PYTH_ENDPOINT);
@@ -53,35 +55,42 @@ class PythClient {
     const allPriceIds = Object.values(PRICE_FEED_IDS).flat();
     try {
       console.log('Fetching price feeds...');
-      const feeds = await this.connection.getLatestPriceFeeds(allPriceIds);
-      if (!feeds) {
-        console.warn('No price feeds returned from Pyth Network');
-        return [];
-      }
-      console.log(`Received ${feeds.length} price feeds`);
-      feeds.forEach(feed => {
-        const price = feed.getPriceNoOlderThan(60);
-        const emaPrice = feed.getEmaPriceNoOlderThan(60);
-        console.log(`Feed ID: ${feed.id}, Symbol: ${PRICE_FEED_SYMBOLS[feed.id]}, Price: ${price?.price}, EMA Price: ${emaPrice?.price}`);
-      });
-      return feeds;
+      return await this.connection.getLatestPriceFeeds(allPriceIds);
     } catch (error) {
       console.error('Error fetching price feeds:', error);
-      if (error instanceof Error) {
-        console.error('Error details:', error.message);
-        console.error('Error stack:', error.stack);
-      }
       throw error;
     }
   }
 
-  subscribeToUpdates(callback: (priceFeed: PriceFeed) => void) {
+  subscribeToUpdates(callback: (priceFeed: PriceFeed) => void, onError: (error: Error) => void) {
     const allPriceIds = Object.values(PRICE_FEED_IDS).flat();
-    this.connection.subscribePriceFeedUpdates(allPriceIds, callback);
+    
+    const handleWebSocketError = (error: Error) => {
+      console.error('WebSocket error:', error);
+      if (this.reconnectAttempts < this.maxReconnectAttempts) {
+        this.reconnectAttempts++;
+        console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+        setTimeout(() => this.subscribeToUpdates(callback, onError), 5000);
+      } else {
+        console.error('Max reconnection attempts reached.');
+        onError(new Error('Failed to establish WebSocket connection after multiple attempts'));
+      }
+    };
+
+    try {
+      this.connection.subscribePriceFeedUpdates(allPriceIds, callback, handleWebSocketError);
+    } catch (error) {
+      console.error('Error subscribing to price feed updates:', error);
+      handleWebSocketError(error as Error);
+    }
   }
 
   closeConnection() {
-    this.connection.closeWebSocket();
+    try {
+      this.connection.closeWebSocket();
+    } catch (error) {
+      console.error('Error closing WebSocket connection:', error);
+    }
   }
 }
 
