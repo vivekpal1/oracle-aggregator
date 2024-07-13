@@ -13,7 +13,10 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({ feeds }) => {
   const [activeTab, setActiveTab] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
 
-  const allFeeds = useMemo(() => Object.values(feeds).flat(), [feeds]);
+  const allFeeds = useMemo(() => {
+    if (!feeds) return [];
+    return Object.values(feeds).flat();
+  }, [feeds]);
 
   const filteredFeeds = useMemo(() => 
     allFeeds.filter(feed => 
@@ -22,9 +25,13 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({ feeds }) => {
     [allFeeds, searchTerm]
   );
 
-  const displayFeeds = activeTab === 'All' ? filteredFeeds : feeds[activeTab.toLowerCase() as keyof CategorizedFeeds] || [];
+  const displayFeeds = activeTab === 'All' ? filteredFeeds : (feeds?.[activeTab.toLowerCase() as keyof CategorizedFeeds] || []);
 
   const tabs = ['All', 'Crypto', 'Equity', 'Metals', 'Forex'];
+
+  if (!feeds || Object.keys(feeds).length === 0) {
+    return <div className="text-center py-8">No price feed data available.</div>;
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

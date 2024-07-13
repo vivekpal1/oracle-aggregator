@@ -12,7 +12,9 @@ const toNumber = (value: string | number | undefined): number => {
 
 export async function GET() {
   try {
+    console.log('Fetching price feeds from Pyth...');
     const pythFeeds = await pythClient.getPriceFeeds();
+    console.log(`Received ${pythFeeds.length} feeds from Pyth`);
     
     const categorizedFeeds: CategorizedFeeds = {
       crypto: [],
@@ -26,14 +28,24 @@ export async function GET() {
       const emaPrice = feed.getEmaPriceNoOlderThan(60);
       const symbol = PYTH_FEED_SYMBOLS[feed.id] || 'Unknown';
       
+      console.log(`Processing ${symbol} from Pyth`);
+      
       let switchboardPrice: number | undefined;
       if (SWITCHBOARD_SUPPORTED_SYMBOLS.includes(symbol)) {
-        const sbResponse = await switchboardClient.fetchPrice(symbol);
-        switchboardPrice = sbResponse.price;
+        console.log(`Fetching Switchboard price for ${symbol}`);
+        try {
+          const sbResponse = await switchboardClient.fetchPrice(symbol);
+          switchboardPrice = sbResponse.price;
+          console.log(`Received Switchboard price for ${symbol}: ${switchboardPrice}`);
+        } catch (error) {
+          console.error(`Error fetching Switchboard price for ${symbol}:`, error);
+        }
       }
 
       const pythPrice = toNumber(price?.price);
       const aggregatedPrice = switchboardPrice ? (pythPrice + switchboardPrice) / 2 : pythPrice;
+
+      console.log(`${symbol} - Pyth: ${pythPrice}, Switchboard: ${switchboardPrice}, Aggregated: ${aggregatedPrice}`);
 
       const feedData: PriceFeed = {
         id: feed.id,
@@ -59,9 +71,11 @@ export async function GET() {
       }
     }
 
+    console.log('Categorized feeds:', JSON.stringify(categorizedFeeds, null, 2));
+
     return NextResponse.json(categorizedFeeds);
   } catch (error) {
     console.error('API: Error in price feeds API:', error);
-    return NextResponse.json({ error: 'Failed to fetch price feeds' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch price feeds', details: (error as Error).message }, { status: 500 });
   }
 }
