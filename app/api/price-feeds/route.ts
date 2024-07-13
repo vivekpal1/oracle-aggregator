@@ -32,6 +32,7 @@ export async function GET() {
   try {
     console.log('API: Fetching price feeds from Pyth and Switchboard...');
     const pythFeeds = await pythClient.getPriceFeeds();
+    console.log(`API: Received ${pythFeeds.length} feeds from Pyth`);
     
     const categorizedFeeds: CategorizedFeeds = {
       crypto: [],
@@ -45,14 +46,24 @@ export async function GET() {
       const emaPrice = feed.getEmaPriceNoOlderThan(60);
       const symbol = PRICE_FEED_SYMBOLS[feed.id] || 'Unknown';
       
+      console.log(`API: Processing ${symbol} from Pyth`);
+      
       let switchboardPrice: number | undefined;
       if (['SOL/USD', 'BTC/USD', 'JUP/USD', 'JITOSOL/USD'].includes(symbol)) {
-        const sbResponse = await switchboardClient.fetchPrice(symbol);
-        switchboardPrice = sbResponse.price;
+        console.log(`API: Fetching Switchboard price for ${symbol}`);
+        try {
+          const sbResponse = await switchboardClient.fetchPrice(symbol);
+          switchboardPrice = sbResponse.price;
+          console.log(`API: Received Switchboard price for ${symbol}: ${switchboardPrice}`);
+        } catch (error) {
+          console.error(`API: Error fetching Switchboard price for ${symbol}:`, error);
+        }
       }
 
       const pythPrice = toNumber(price?.price);
       const aggregatedPrice = switchboardPrice ? (pythPrice + switchboardPrice) / 2 : pythPrice;
+
+      console.log(`API: ${symbol} - Pyth: ${pythPrice}, Switchboard: ${switchboardPrice}, Aggregated: ${aggregatedPrice}`);
 
       const feedData: PriceFeed = {
         id: feed.id,

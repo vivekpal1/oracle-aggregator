@@ -55,7 +55,12 @@ class PythClient {
     const allPriceIds = Object.values(PRICE_FEED_IDS).flat();
     try {
       console.log('Fetching price feeds...');
-      return await this.connection.getLatestPriceFeeds(allPriceIds);
+      const feeds = await this.connection.getLatestPriceFeeds(allPriceIds);
+      if (!feeds) {
+        console.warn('No price feeds returned from Pyth Network');
+        return [];
+      }
+      return feeds;
     } catch (error) {
       console.error('Error fetching price feeds:', error);
       throw error;
@@ -78,7 +83,14 @@ class PythClient {
     };
 
     try {
-      this.connection.subscribePriceFeedUpdates(allPriceIds, callback, handleWebSocketError);
+      this.connection.subscribePriceFeedUpdates(allPriceIds, (priceFeed) => {
+        try {
+          callback(priceFeed);
+        } catch (error) {
+          console.error('Error in price feed callback:', error);
+          handleWebSocketError(error as Error);
+        }
+      });
     } catch (error) {
       console.error('Error subscribing to price feed updates:', error);
       handleWebSocketError(error as Error);
