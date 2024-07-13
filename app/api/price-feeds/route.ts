@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
 import { pythClient, PRICE_FEED_SYMBOLS, PRICE_FEED_IDS } from '../../../lib/pythClient';
+import { switchboardClient } from '../../../lib/switchboardClient';
 
 interface PriceFeed {
   id: string;
   symbol: string;
-  price: number;
+  pythPrice: number;
+  switchboardPrice: number | undefined;
+  aggregatedPrice: number;
   confidence: number;
   publishTime: number;
   emaPrice: number;
@@ -27,9 +30,8 @@ const toNumber = (value: string | number | undefined): number => {
 
 export async function GET() {
   try {
-    console.log('API: Fetching price feeds from Pyth Network...');
-    const priceFeeds = await pythClient.getPriceFeeds();
-    console.log(`API: Received ${priceFeeds.length} price feeds`);
+    console.log('API: Fetching price feeds from Pyth and Switchboard...');
+    const pythFeeds = await pythClient.getPriceFeeds();
     
     const categorizedFeeds: CategorizedFeeds = {
       crypto: [],
@@ -38,13 +40,26 @@ export async function GET() {
       forex: []
     };
 
-    priceFeeds.forEach(feed => {
+    for (const feed of pythFeeds) {
       const price = feed.getPriceNoOlderThan(60);
       const emaPrice = feed.getEmaPriceNoOlderThan(60);
+      const symbol = PRICE_FEED_SYMBOLS[feed.id] || 'Unknown';
+      
+      let switchboardPrice: number | undefined;
+      if (['SOL/USD', 'BTC/USD', 'JUP/USD', 'JITOSOL/USD'].includes(symbol)) {
+        const sbResponse = await switchboardClient.fetchPrice(symbol);
+        switchboardPrice = sbResponse.price;
+      }
+
+      const pythPrice = toNumber(price?.price);
+      const aggregatedPrice = switchboardPrice ? (pythPrice + switchboardPrice) / 2 : pythPrice;
+
       const feedData: PriceFeed = {
         id: feed.id,
-        symbol: PRICE_FEED_SYMBOLS[feed.id] || 'Unknown',
-        price: toNumber(price?.price),
+        symbol,
+        pythPrice,
+        switchboardPrice,
+        aggregatedPrice,
         confidence: toNumber(price?.conf),
         publishTime: price?.publishTime || 0,
         emaPrice: toNumber(emaPrice?.price),
@@ -60,10 +75,8 @@ export async function GET() {
         categorizedFeeds.metals.push(feedData);
       } else if (PRICE_FEED_IDS.forex.includes(feed.id)) {
         categorizedFeeds.forex.push(feedData);
-      } else {
-        console.warn(`API: Unrecognized feed ID: ${feed.id}`);
       }
-    });
+    }
 
     console.log('API: Categorized feeds:', JSON.stringify(categorizedFeeds, null, 2));
 
