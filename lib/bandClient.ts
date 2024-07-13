@@ -17,7 +17,7 @@ class BandClient {
       
       const prices: { [key: string]: number } = {};
       referenceData.forEach((data, index) => {
-        prices[symbols[index]] = parseFloat(data.rate);
+        prices[symbols[index]] = data.rate;
       });
       
       return prices;

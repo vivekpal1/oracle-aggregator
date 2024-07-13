@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { pythClient } from '../../../lib/pythClient';
 import { switchboardClient } from '../../../lib/switchboardClient';
-import { PYTH_FEED_SYMBOLS, PYTH_FEED_IDS, SWITCHBOARD_SUPPORTED_SYMBOLS } from '../../../lib/feedIds';
+import { bandClient } from '../../../lib/bandClient';
+import { FEED_IDS, SUPPORTED_SYMBOLS, BAND_SYMBOLS, SupportedSymbol } from '../../../lib/feedIds';
 import { CategorizedFeeds, PriceFeed } from '../../../types';
 
 const toNumber = (value: string | number | undefined): number => {
@@ -11,10 +12,14 @@ const toNumber = (value: string | number | undefined): number => {
 };
 
 export async function GET() {
+  console.log('API route: GET request received');
   try {
-    console.log('Fetching price feeds from Pyth...');
-    const pythFeeds = await pythClient.getPriceFeeds();
-    console.log(`Received ${pythFeeds.length} feeds from Pyth`);
+    console.log('API route: Fetching price feeds from Pyth, Switchboard, and Band...');
+    const [pythFeeds, bandPrices] = await Promise.all([
+      pythClient.getPriceFeeds(),
+      bandClient.getPrices(BAND_SYMBOLS)
+    ]);
+    console.log(`API route: Received ${pythFeeds.length} feeds from Pyth and ${Object.keys(bandPrices).length} from Band`);
     
     const categorizedFeeds: CategorizedFeeds = {
       crypto: [],
@@ -23,71 +28,63 @@ export async function GET() {
       forex: []
     };
 
-    for (const feed of pythFeeds) {
-      const price = feed.getPriceNoOlderThan(60);
-      const emaPrice = feed.getEmaPriceNoOlderThan(60);
-      const symbol = PYTH_FEED_SYMBOLS[feed.id];
+    for (const symbol of SUPPORTED_SYMBOLS) {
+      console.log(`API route: Processing ${symbol}`);
       
-      if (!symbol) {
-        console.warn(`Unknown symbol for feed ID: ${feed.id}`);
+      const pythFeed = pythFeeds.find(feed => feed.id === FEED_IDS[symbol].pyth);
+      if (!pythFeed) {
+        console.warn(`API route: No Pyth feed found for ${symbol}`);
         continue;
       }
       
-      console.log(`Processing ${symbol} from Pyth`);
+      const pythPrice = pythFeed.getPriceNoOlderThan(60);
+      const emaPrice = pythFeed.getEmaPriceNoOlderThan(60);
       
       let switchboardPrice: number | undefined;
-      if (SWITCHBOARD_SUPPORTED_SYMBOLS.includes(symbol)) {
-        console.log(`Fetching Switchboard price for ${symbol}`);
-        try {
-          const sbResponse = await switchboardClient.fetchPrice(symbol);
-          switchboardPrice = sbResponse.price;
-          console.log(`Received Switchboard price for ${symbol}: ${switchboardPrice}`);
-        } catch (error) {
-          console.error(`Error fetching Switchboard price for ${symbol}:`, error);
-        }
+      console.log(`API route: Fetching Switchboard price for ${symbol}`);
+      try {
+        const sbResponse = await switchboardClient.fetchPrice(symbol);
+        switchboardPrice = sbResponse.price;
+        console.log(`API route: Received Switchboard price for ${symbol}: ${switchboardPrice}`);
+      } catch (error) {
+        console.error(`API route: Error fetching Switchboard price for ${symbol}:`, error);
       }
 
-      const pythPrice = toNumber(price?.price);
-      const aggregatedPrice = switchboardPrice ? (pythPrice + switchboardPrice) / 2 : pythPrice;
+      const bandPrice = bandPrices[FEED_IDS[symbol].band];
 
-      console.log(`${symbol} - Pyth: ${pythPrice}, Switchboard: ${switchboardPrice}, Aggregated: ${aggregatedPrice}`);
+      const pythPriceValue = toNumber(pythPrice?.price);
+      const prices = [pythPriceValue, switchboardPrice, bandPrice].filter(p => p !== undefined) as number[];
+      const aggregatedPrice = prices.reduce((a, b) => a + b, 0) / prices.length;
+
+      console.log(`API route: ${symbol} - Pyth: ${pythPriceValue}, Switchboard: ${switchboardPrice}, Band: ${bandPrice}, Aggregated: ${aggregatedPrice}`);
 
       const feedData: PriceFeed = {
-        id: feed.id,
+        id: pythFeed.id,
         symbol,
-        pythPrice,
+        pythPrice: pythPriceValue,
         switchboardPrice,
+        bandPrice,
         aggregatedPrice,
-        confidence: toNumber(price?.conf),
-        publishTime: price?.publishTime || 0,
+        confidence: toNumber(pythPrice?.conf),
+        publishTime: pythPrice?.publishTime || 0,
         emaPrice: toNumber(emaPrice?.price),
         emaConfidence: toNumber(emaPrice?.conf),
-        expo: price?.expo || 0,
+        expo: pythPrice?.expo || 0,
       };
 
-      if (PYTH_FEED_IDS.crypto.includes(feed.id)) {
-        categorizedFeeds.crypto.push(feedData);
-      } else if (PYTH_FEED_IDS.equity.includes(feed.id)) {
-        categorizedFeeds.equity.push(feedData);
-      } else if (PYTH_FEED_IDS.metals.includes(feed.id)) {
-        categorizedFeeds.metals.push(feedData);
-      } else if (PYTH_FEED_IDS.forex.includes(feed.id)) {
-        categorizedFeeds.forex.push(feedData);
-      } else {
-        console.warn(`Uncategorized feed: ${symbol}`);
-      }
+      categorizedFeeds.crypto.push(feedData);
     }
 
-    console.log('Categorized feeds:', JSON.stringify(categorizedFeeds, null, 2));
+    console.log('API route: Categorized feeds:', JSON.stringify(categorizedFeeds, null, 2));
 
-    console.log('Sending categorized feeds to client');
+    console.log('API route: Sending categorized feeds to client');
     return NextResponse.json(categorizedFeeds, {
       headers: {
         'Cache-Control': 'no-store, max-age=0',
       },
     });
   } catch (error) {
-    console.error('API: Error in price feeds API:', error);
+    console.error('API route: Error in price feeds API:', error);
     return NextResponse.json(
       { error: 'Failed to fetch price feeds', details: (error as Error).message },
       { status: 500, headers: { 'Cache-Control': 'no-store, max-age=0' } }

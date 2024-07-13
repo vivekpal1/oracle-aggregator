@@ -1,5 +1,5 @@
 import { PriceServiceConnection, PriceFeed } from '@pythnetwork/price-service-client';
-import { PYTH_FEED_IDS, PYTH_FEED_SYMBOLS } from './feedIds';
+import { FEED_IDS, PYTH_FEED_IDS } from './feedIds';
 
 const PYTH_ENDPOINT = "https://hermes.pyth.network";
 
@@ -11,19 +11,15 @@ class PythClient {
   }
 
   async getPriceFeeds(): Promise<PriceFeed[]> {
-    const allPriceIds = Object.values(PYTH_FEED_IDS).flat();
+    const pythFeedIds = Object.values(FEED_IDS).map(ids => ids.pyth);
     try {
       console.log('Fetching price feeds...');
-      const feeds = await this.connection.getLatestPriceFeeds(allPriceIds);
+      const feeds = await this.connection.getLatestPriceFeeds(pythFeedIds);
       if (!feeds) {
         console.warn('No price feeds returned from Pyth Network');
         return [];
       }
       console.log(`Received ${feeds.length} price feeds`);
-      feeds.forEach(feed => {
-        const price = feed.getPriceNoOlderThan(60);
-        console.log(`Feed ID: ${feed.id}, Symbol: ${PYTH_FEED_SYMBOLS[feed.id]}, Price: ${price?.price}`);
-      });
       return feeds;
     } catch (error) {
       console.error('Error fetching price feeds:', error);
