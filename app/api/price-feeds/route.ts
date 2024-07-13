@@ -26,7 +26,12 @@ export async function GET() {
     for (const feed of pythFeeds) {
       const price = feed.getPriceNoOlderThan(60);
       const emaPrice = feed.getEmaPriceNoOlderThan(60);
-      const symbol = PYTH_FEED_SYMBOLS[feed.id] || 'Unknown';
+      const symbol = PYTH_FEED_SYMBOLS[feed.id];
+      
+      if (!symbol) {
+        console.warn(`Unknown symbol for feed ID: ${feed.id}`);
+        continue;
+      }
       
       console.log(`Processing ${symbol} from Pyth`);
       
@@ -68,14 +73,24 @@ export async function GET() {
         categorizedFeeds.metals.push(feedData);
       } else if (PYTH_FEED_IDS.forex.includes(feed.id)) {
         categorizedFeeds.forex.push(feedData);
+      } else {
+        console.warn(`Uncategorized feed: ${symbol}`);
       }
     }
 
     console.log('Categorized feeds:', JSON.stringify(categorizedFeeds, null, 2));
 
-    return NextResponse.json(categorizedFeeds);
+    console.log('Sending categorized feeds to client');
+    return NextResponse.json(categorizedFeeds, {
+      headers: {
+        'Cache-Control': 'no-store, max-age=0',
+      },
+    });
   } catch (error) {
     console.error('API: Error in price feeds API:', error);
-    return NextResponse.json({ error: 'Failed to fetch price feeds', details: (error as Error).message }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to fetch price feeds', details: (error as Error).message },
+      { status: 500, headers: { 'Cache-Control': 'no-store, max-age=0' } }
+    );
   }
 }

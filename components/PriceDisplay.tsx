@@ -1,43 +1,64 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { CategorizedFeeds, PriceFeed } from '../types';
 import AggregatedPrice from './AggregatedPrice';
 import { Search } from 'lucide-react';
 
-interface PriceDisplayProps {
-  feeds: CategorizedFeeds;
-}
-
-const PriceDisplay: React.FC<PriceDisplayProps> = ({ feeds }) => {
+const PriceDisplay: React.FC = () => {
+  const [feeds, setFeeds] = useState<CategorizedFeeds>({ crypto: [], equity: [], metals: [], forex: [] });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
 
+  useEffect(() => {
+    const fetchFeeds = async () => {
+      try {
+        console.log('Fetching feeds from client-side');
+        const response = await fetch('/api/price-feeds');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        console.log('Received data on client-side:', data);
+        setFeeds(data);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching feeds:', error);
+        setError('Failed to fetch price feeds');
+        setLoading(false);
+      }
+    };
+
+    fetchFeeds();
+  }, []);
+
   const allFeeds = useMemo(() => {
-    if (!feeds) return [];
-    return Object.values(feeds).flat();
+    const allFeedsArray = Object.values(feeds).flat();
+    console.log('All feeds:', allFeedsArray);
+    return allFeedsArray;
   }, [feeds]);
 
-  const filteredFeeds = useMemo(() => 
-    allFeeds.filter(feed => 
+  const filteredFeeds = useMemo(() => {
+    const filtered = allFeeds.filter(feed => 
       feed.symbol.toLowerCase().includes(searchTerm.toLowerCase())
-    ),
-    [allFeeds, searchTerm]
-  );
+    );
+    console.log('Filtered feeds:', filtered);
+    return filtered;
+  }, [allFeeds, searchTerm]);
 
-  const displayFeeds = activeTab === 'All' ? filteredFeeds : (feeds?.[activeTab.toLowerCase() as keyof CategorizedFeeds] || []);
+  const displayFeeds = activeTab === 'All' ? filteredFeeds : feeds[activeTab.toLowerCase() as keyof CategorizedFeeds] || [];
+  console.log('Display feeds:', displayFeeds);
 
-  const tabs = ['All', 'Crypto', 'Equity', 'Metals', 'Forex'];
-
-  if (!feeds || Object.keys(feeds).length === 0) {
-    return <div className="text-center py-8">No price feed data available.</div>;
-  }
+  if (loading) return <div className="text-center py-8">Loading price feeds...</div>;
+  if (error) return <div className="text-center py-8 text-red-500">{error}</div>;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-6 flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
         <div className="flex flex-wrap justify-center sm:justify-start space-x-2">
-          {tabs.map(tab => (
+          {['All', 'Crypto', 'Equity', 'Metals', 'Forex'].map(tab => (
             <button
               key={tab}
               className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
