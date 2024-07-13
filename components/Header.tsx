@@ -19,13 +19,13 @@ const Header: React.FC = () => {
                 </Link>
               </li>
               <li>
-                <Link href="/about" className="text-gray-600 hover:text-blue-600 transition-colors">
-                  About
+                <Link href="#" className="text-gray-600 hover:text-blue-600 transition-colors">
+                  Video
                 </Link>
               </li>
               <li>
-                <Link href="/contact" className="text-gray-600 hover:text-blue-600 transition-colors">
-                  Contact
+                <Link href="https://github.com/vivekpal1/oracle-aggregator" className="text-gray-600 hover:text-blue-600 transition-colors">
+                  Github
                 </Link>
               </li>
             </ul>

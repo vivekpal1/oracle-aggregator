@@ -1,5 +1,5 @@
 import React from 'react';
-import { Twitter, Github, Linkedin } from 'lucide-react';
+import { X, Github } from 'lucide-react';
 
 const Footer: React.FC = () => {
   return (
@@ -12,14 +12,11 @@ const Footer: React.FC = () => {
             </p>
           </div>
           <div className="flex space-x-4">
-            <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-blue-600 transition-colors">
-              <Twitter size={24} />
+            <a href="https://x.com/vivekpal0x" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-blue-600 transition-colors">
+              <X size={24} />
             </a>
-            <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-blue-600 transition-colors">
+            <a href="https://github.com/vivekpal1" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-blue-600 transition-colors">
               <Github size={24} />
-            </a>
-            <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-blue-600 transition-colors">
-              <Linkedin size={24} />
             </a>
           </div>
         </div>
